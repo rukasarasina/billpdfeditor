@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sticker PDF Lab</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Gaegu:wght@400;700&family=IBM+Plex+Sans:wght@400;600&family=Nanum+Pen+Script&family=Permanent+Marker&family=VT323&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css?v=20260213-02" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-dot"></span>
+          <div>
+            <h1>Sticker PDF Lab</h1>
+            <p>Edit text, draw, decorate, and export.</p>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <select id="ocrLangSelect" class="ghost-input">
+            <option value="eng">🔎 OCR English</option>
+            <option value="kor">🔎 OCR Korean</option>
+            <option value="eng+kor">🔎 OCR Eng + Kor</option>
+          </select>
+          <button id="ocrBtn" class="ghost-btn" disabled>🔎 OCR</button>
+          <label class="file-label" for="fileInput">📂 Open PDF</label>
+          <input id="fileInput" type="file" accept="application/pdf" />
+          <button id="exportBtn" class="primary-btn" disabled>📤 Export PDF</button>
+        </div>
+      </header>
+
+      <div class="workspace">
+        <aside class="thumbnail-panel">
+          <div class="panel-heading">
+            <h2>Pages</h2>
+            <p id="pageCountLabel">No file loaded</p>
+          </div>
+          <div id="thumbnailList" class="thumbnail-list"></div>
+        </aside>
+
+        <main class="editor-surface">
+          <section class="tool-rail">
+            <button class="tool-btn active" data-tool="select" title="Select (V)">🎯 Select</button>
+            <button class="tool-btn" data-tool="editText" title="Edit Text (R)">📝 Edit Text</button>
+            <button class="tool-btn" data-tool="draw" title="Free draw (D)">✏️ Draw</button>
+            <button class="tool-btn" data-tool="text" title="Add text (T)">🔤 Add Text</button>
+            <button class="tool-btn" data-tool="rect" title="Rectangle">🟥 Rect</button>
+            <button class="tool-btn" data-tool="ellipse" title="Ellipse">🟠 Ellipse</button>
+            <button class="tool-btn" data-tool="line" title="Line">📏 Line</button>
+            <button id="deleteSelectionBtn" class="tool-btn danger">🗑️ Delete</button>
+            <button id="duplicateSelectionBtn" class="tool-btn">📄 Duplicate</button>
+          </section>
+
+          <section class="stage-panel">
+            <div class="stage-toolbar">
+              <button id="prevPageBtn" class="ghost-btn" disabled>⬅️ Prev</button>
+              <span id="pagePositionLabel">Page 0 / 0</span>
+              <button id="nextPageBtn" class="ghost-btn" disabled>Next ➡️</button>
+              <div class="toolbar-divider"></div>
+              <button id="undoBtn" class="ghost-btn" disabled>↩️ Undo</button>
+              <button id="redoBtn" class="ghost-btn" disabled>↪️ Redo</button>
+              <button id="clearPageBtn" class="ghost-btn" disabled>🧹 Clear Page</button>
+              <div class="toolbar-divider"></div>
+              <label class="zoom-control" for="zoomRangeInput">🔍 Zoom</label>
+              <button id="zoomOutBtn" class="ghost-btn zoom-mini-btn" disabled>➖</button>
+              <input
+                id="zoomRangeInput"
+                class="zoom-slider"
+                type="range"
+                min="50"
+                max="200"
+                step="5"
+                value="100"
+                disabled
+              />
+              <button id="zoomInBtn" class="ghost-btn zoom-mini-btn" disabled>➕</button>
+              <button id="zoomResetBtn" class="ghost-btn zoom-mini-btn" disabled>100%</button>
+              <button id="zoomFitBtn" class="ghost-btn zoom-mini-btn" disabled>Fit</button>
+              <span id="zoomValueLabel" class="zoom-value">100%</span>
+            </div>
+            <div id="dropHint" class="drop-hint">Drop a PDF here or click Open PDF</div>
+            <div id="stageScroller" class="stage-scroller">
+              <div id="pageStage" class="page-stage"></div>
+            </div>
+            <div id="statusLine" class="status-line">Ready</div>
+          </section>
+
+          <aside class="property-panel">
+            <h2>Properties</h2>
+            <label>
+              Stroke
+              <input id="strokeColorInput" type="color" value="#0d4efd" />
+            </label>
+            <label>
+              Fill
+              <input id="fillColorInput" type="color" value="#63a1ff" />
+            </label>
+            <label>
+              Fill Opacity
+              <input id="fillOpacityInput" type="range" min="0" max="1" step="0.05" value="0.2" />
+            </label>
+            <label>
+              Text Color
+              <input id="textColorInput" type="color" value="#0f172a" />
+            </label>
+            <label>
+              Font
+              <select id="fontFamilySelect">
+                <option value="Gaegu, cursive">Gaegu</option>
+                <option value="'VT323', monospace">VT323</option>
+                <option value="'Permanent Marker', cursive">Permanent Marker</option>
+                <option value="'Caveat', cursive">Caveat</option>
+                <option value="'Nanum Pen Script', cursive">Nanum Pen</option>
+                <option value="'IBM Plex Sans', sans-serif">IBM Plex Sans</option>
+                <option value="Arial, sans-serif">Arial</option>
+              </select>
+            </label>
+            <label>
+              Stroke Width
+              <input id="strokeWidthInput" type="range" min="1" max="24" step="1" value="3" />
+            </label>
+            <label>
+              Font Size
+              <input id="fontSizeInput" type="range" min="10" max="96" step="1" value="24" />
+            </label>
+            <button id="bringFrontBtn" class="ghost-btn">⬆️ Bring To Front</button>
+            <button id="sendBackBtn" class="ghost-btn">⬇️ Send To Back</button>
+
+            <section class="split-panel">
+              <h3>✂️ Split PDF</h3>
+              <p class="split-note">Extract page ranges from the edited document.</p>
+              <div class="split-row">
+                <label>
+                  From
+                  <input id="splitFromInput" type="number" min="1" step="1" value="1" />
+                </label>
+                <label>
+                  To
+                  <input id="splitToInput" type="number" min="1" step="1" value="1" />
+                </label>
+              </div>
+              <div class="split-actions">
+                <button id="addSplitRangeBtn" class="ghost-btn" disabled>➕ Add Range</button>
+                <button id="clearSplitRangesBtn" class="ghost-btn" disabled>🧹 Clear</button>
+              </div>
+              <div id="splitRangeList" class="split-range-list"></div>
+              <label class="split-merge">
+                <input id="mergeSplitRangesInput" type="checkbox" checked />
+                Merge all ranges into one PDF
+              </label>
+              <button id="splitPdfBtn" class="primary-btn" disabled>✂️ Split / Extract</button>
+            </section>
+          </aside>
+        </main>
+      </div>
+    </div>
+    <script src="app.js?v=20260213-20"></script>
+  </body>
+</html>
