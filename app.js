@@ -321,7 +321,7 @@
       return 1;
     }
     const wantedWidth = Math.max(Number(targetWidth || 0), 2);
-    return clamp(wantedWidth / measured, 0.72, 1.38);
+    return clamp(wantedWidth / measured, 0.82, 1.22);
   }
 
   function getEditableGroupBaseDimension(group, mask, axis) {
@@ -447,11 +447,11 @@
 
   function sampleTextFillColor(canvas, left, top, width, height) {
     if (!canvas) {
-      return state.textColor;
+      return DEFAULT_DETECTED_TEXT_COLOR;
     }
     const ctx = canvas.getContext("2d");
     if (!ctx) {
-      return state.textColor;
+      return DEFAULT_DETECTED_TEXT_COLOR;
     }
 
     const maxX = canvas.width - 1;
@@ -480,10 +480,13 @@
     }
 
     if (!best) {
-      return state.textColor;
+      return DEFAULT_DETECTED_TEXT_COLOR;
     }
-    if (best.lightness > 720) {
-      return state.textColor;
+    const maxChannel = Math.max(best.r, best.g, best.b);
+    const minChannel = Math.min(best.r, best.g, best.b);
+    const saturationSpread = maxChannel - minChannel;
+    if (best.lightness > 660 || (best.lightness > 540 && saturationSpread > 55)) {
+      return DEFAULT_DETECTED_TEXT_COLOR;
     }
     return `rgb(${best.r}, ${best.g}, ${best.b})`;
   }
@@ -616,6 +619,16 @@
     const maskWidth = Math.max(getScaledObjectDimension(mask, "width"), 6);
     const textWidth = Math.max(maskWidth - padX * 2, 4);
     const textHeight = Math.max(getScaledObjectDimension(mask, "height") - padY * 2, 8);
+    const canvasWidth =
+      group && group.canvas && typeof group.canvas.getWidth === "function"
+        ? Number(group.canvas.getWidth() || 0)
+        : 0;
+    const groupCanvasPoint = getObjectTopLeftOnCanvas(group);
+    const groupLeftOnCanvas = Number(
+      Number.isFinite(groupCanvasPoint.x) ? groupCanvasPoint.x : group.left || 0,
+    );
+    const hitsRightBoundary =
+      canvasWidth > 1 && groupLeftOnCanvas + maskWidth >= canvasWidth - 1.5;
     const textScaleX = Math.max(Number(group.fontScaleX || 1), 0.5);
     const fallbackFitFontSize = fitEditedFontSizeToBox({
       text: effectiveText,
@@ -639,8 +652,8 @@
       edited &&
       !deleted &&
       !hasLivePreview &&
-      measuredWidth > textWidth + 0.5 &&
-      textWidth >= Number(group.baseWidth || 0) - 1;
+      measuredWidth > textWidth + 2 &&
+      hitsRightBoundary;
     const renderFontSize = shouldShrinkForOverflow
       ? fallbackFitFontSize
       : Math.max(effectiveFontSize, 8);
@@ -1205,55 +1218,70 @@
     return `'${clean.replace(/'/g, "\\'")}'`;
   }
 
-  function mapPdfFontFamily(fontFamilyRaw, fontNameRaw) {
-    const fontFamilyToken = normalizePdfFontToken(fontFamilyRaw);
-    const fontNameToken = normalizePdfFontToken(fontNameRaw);
-    const rawFamilyToken = normalizeRawFontCandidate(fontFamilyRaw);
-    const rawNameToken = normalizeRawFontCandidate(fontNameRaw);
-    const normalized = `${fontFamilyToken} ${fontNameToken}`.toLowerCase();
-
-    const customCandidates = [];
-    [rawFamilyToken, rawNameToken, fontFamilyToken, fontNameToken].forEach((token) => {
-      if (!token || isGenericFontFamily(token)) {
-        return;
-      }
-      if (!customCandidates.some((existing) => existing.toLowerCase() === token.toLowerCase())) {
-        customCandidates.push(token);
-      }
-    });
-
-    let fallback = "Arial, sans-serif";
+  function pickCanonicalFontStack(rawTokenValue) {
+    const normalized = String(rawTokenValue || "").toLowerCase();
+    if (!normalized) {
+      return "";
+    }
+    if (normalized.includes("segoe ui") || normalized.includes("segoeui")) {
+      return "'Segoe UI', Arial, sans-serif";
+    }
+    if (normalized.includes("arial")) {
+      return "Arial, 'Helvetica Neue', Helvetica, sans-serif";
+    }
+    if (normalized.includes("helvetica")) {
+      return "'Helvetica Neue', Helvetica, Arial, sans-serif";
+    }
+    if (normalized.includes("calibri")) {
+      return "Calibri, Arial, sans-serif";
+    }
+    if (normalized.includes("tahoma")) {
+      return "Tahoma, 'Segoe UI', Arial, sans-serif";
+    }
+    if (normalized.includes("verdana")) {
+      return "Verdana, Arial, sans-serif";
+    }
+    if (normalized.includes("trebuchet")) {
+      return "'Trebuchet MS', Arial, sans-serif";
+    }
+    if (normalized.includes("cambria")) {
+      return "Cambria, 'Times New Roman', serif";
+    }
+    if (
+      normalized.includes("times") ||
+      normalized.includes("garamond") ||
+      normalized.includes("georgia")
+    ) {
+      return "'Times New Roman', Georgia, serif";
+    }
     if (
       normalized.includes("courier") ||
       normalized.includes("consolas") ||
       normalized.includes("mono")
     ) {
-      fallback = "'Courier New', monospace";
-    } else if (normalized.includes("calibri")) {
-      fallback = "Calibri, Arial, sans-serif";
-    } else if (
-      normalized.includes("times") ||
-      normalized.includes("garamond") ||
-      normalized.includes("georgia")
-    ) {
-      fallback = "'Times New Roman', Georgia, serif";
-    } else if (normalized.includes("cambria")) {
-      fallback = "Cambria, Georgia, serif";
-    } else if (
-      normalized.includes("helvetica") ||
-      normalized.includes("arial") ||
-      normalized.includes("sans")
-    ) {
-      fallback = "Arial, sans-serif";
+      return "'Courier New', Consolas, monospace";
     }
+    return "";
+  }
 
-    if (!customCandidates.length) {
-      return fallback;
+  function mapPdfFontFamily(fontFamilyRaw, fontNameRaw) {
+    const fontFamilyToken = normalizePdfFontToken(fontFamilyRaw);
+    const fontNameToken = normalizePdfFontToken(fontNameRaw);
+    const rawFamilyToken = normalizeRawFontCandidate(fontFamilyRaw);
+    const rawNameToken = normalizeRawFontCandidate(fontNameRaw);
+    const normalizedAll = `${fontFamilyToken} ${fontNameToken} ${rawFamilyToken} ${rawNameToken}`;
+    const canonicalStack = pickCanonicalFontStack(normalizedAll);
+    if (canonicalStack) {
+      return canonicalStack;
     }
-    const quotedCandidates = customCandidates
-      .map(quoteFontFamily)
-      .filter((token) => Boolean(token));
-    return `${quotedCandidates.join(", ")}, ${fallback}`;
+    const normalized = normalizedAll.toLowerCase();
+    if (normalized.includes("serif")) {
+      return "'Times New Roman', serif";
+    }
+    if (normalized.includes("mono")) {
+      return "'Courier New', monospace";
+    }
+    return "Arial, sans-serif";
   }
 
   function derivePdfFontTraits(style, item) {
@@ -1818,15 +1846,42 @@
         return;
       }
       const estimatedFontSize = Math.max(
-        Math.min(fontHeight * 1.02, clampedHeight * 0.94),
+        Math.min(fontHeight * 1.08, clampedHeight * 0.98),
         8,
       );
+      const measuredTextWidth = measureSingleLineTextWidth(
+        value,
+        fontTraits.fontFamily,
+        estimatedFontSize,
+        fontTraits.fontWeight,
+        fontTraits.fontStyle,
+      );
+      const generousMeasuredWidth = Math.max(measuredTextWidth * 1.08 + 4, 8);
+      let normalizedWidth = width;
+      if (
+        Number.isFinite(measuredTextWidth) &&
+        measuredTextWidth > 0 &&
+        normalizedWidth > generousMeasuredWidth * 1.25
+      ) {
+        normalizedWidth = Math.max(generousMeasuredWidth, 6);
+      }
+      normalizedWidth = clamp(normalizedWidth, 2, entry.fabric.getWidth() - left);
+
+      const targetSingleLineHeight = Math.max(estimatedFontSize * 1.25 + 2, 9);
+      let normalizedHeight = clampedHeight;
+      if (normalizedHeight > targetSingleLineHeight * 1.45) {
+        normalizedHeight = Math.max(targetSingleLineHeight, 9);
+      }
+      normalizedHeight = clamp(normalizedHeight, 2, entry.fabric.getHeight() - top);
+      if (normalizedWidth < 2 || normalizedHeight < 2) {
+        return;
+      }
 
       const group = createEditableTextGroup({
         left,
         top,
-        width,
-        height: clampedHeight,
+        width: normalizedWidth,
+        height: normalizedHeight,
         text: value,
         fontSize: estimatedFontSize,
         fontFamily: fontTraits.fontFamily,
@@ -1838,22 +1893,22 @@
           estimatedFontSize,
           fontTraits.fontWeight,
           fontTraits.fontStyle,
-          Math.max(width - 4, 4),
+          Math.max(normalizedWidth - 4, 4),
         ),
         source: "pdf",
         maskFillColor: sampleMaskFillColor(
           entry.backgroundCanvas,
           left,
           top,
-          width,
-          clampedHeight,
+          normalizedWidth,
+          normalizedHeight,
         ),
         textFillColor: sampleTextFillColor(
           entry.backgroundCanvas,
           left,
           top,
-          width,
-          clampedHeight,
+          normalizedWidth,
+          normalizedHeight,
         ),
       });
       entry.fabric.add(group);

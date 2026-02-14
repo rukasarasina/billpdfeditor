@@ -152,9 +152,11 @@ body::after {
 
 .tool-rail .tool-btn {
   width: 100%;
-  padding: 9px 8px;
-  font-size: 1.18rem;
-  line-height: 1.06;
+  display: block;
+  padding: 8px 7px;
+  font-size: 1.08rem;
+  line-height: 1.08;
+  letter-spacing: 0.01em;
   white-space: normal;
   overflow-wrap: anywhere;
   word-break: break-word;
@@ -401,6 +403,7 @@ body::after {
   flex: 1;
   min-height: 0;
   overflow: auto;
+  overscroll-behavior: contain;
   padding: 14px;
   background:
     radial-gradient(circle at 12px 12px, #d8e6ff 2px, transparent 2px) 0 0 /
@@ -411,8 +414,10 @@ body::after {
 .page-stage {
   min-height: 100%;
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: flex-start;
+  width: max-content;
+  min-width: 100%;
 }
 
 .pdf-page {
