@@ -15,6 +15,7 @@
     "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
   const CREATE_TOOLS = new Set(["text", "rect", "ellipse", "line"]);
+  const DEFAULT_DETECTED_TEXT_COLOR = "#111827";
   const SERIALIZED_PROPS = [
     "isHelper",
     "isInlineEditor",
@@ -894,6 +895,17 @@
     return { from, to };
   }
 
+  function clampSplitInputValue(input, totalPages, fallback) {
+    if (!input) {
+      return;
+    }
+    const parsed = Number.parseInt(input.value, 10);
+    const safeFallback = Number.isFinite(fallback) ? fallback : 1;
+    let nextValue = Number.isFinite(parsed) ? parsed : safeFallback;
+    nextValue = clamp(nextValue, 1, Math.max(totalPages, 1));
+    input.value = String(nextValue);
+  }
+
   function syncSplitInputBounds() {
     if (!ui.splitFromInput || !ui.splitToInput) {
       return;
@@ -904,14 +916,8 @@
     ui.splitToInput.min = "1";
     ui.splitFromInput.max = String(maxValue);
     ui.splitToInput.max = String(maxValue);
-    const range = sanitizeSplitRange(ui.splitFromInput.value, ui.splitToInput.value, maxValue);
-    if (!range) {
-      ui.splitFromInput.value = "1";
-      ui.splitToInput.value = "1";
-      return;
-    }
-    ui.splitFromInput.value = String(range.from);
-    ui.splitToInput.value = String(range.to);
+    clampSplitInputValue(ui.splitFromInput, maxValue, 1);
+    clampSplitInputValue(ui.splitToInput, maxValue, maxValue);
   }
 
   function renderSplitRanges() {
@@ -3373,6 +3379,7 @@
       ui.splitPdfBtn.addEventListener("click", splitPdfByRanges);
     }
     if (ui.splitFromInput) {
+      ui.splitFromInput.addEventListener("input", syncSplitInputBounds);
       ui.splitFromInput.addEventListener("change", syncSplitInputBounds);
       ui.splitFromInput.addEventListener("keydown", (event) => {
         if (event.key === "Enter") {
@@ -3382,6 +3389,7 @@
       });
     }
     if (ui.splitToInput) {
+      ui.splitToInput.addEventListener("input", syncSplitInputBounds);
       ui.splitToInput.addEventListener("change", syncSplitInputBounds);
       ui.splitToInput.addEventListener("keydown", (event) => {
         if (event.key === "Enter") {

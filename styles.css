@@ -11,7 +11,7 @@
   --danger: #c12828;
   --shadow: 4px 4px 0 var(--line);
   --pages-col: clamp(188px, 13.5vw, 226px);
-  --tool-col: clamp(106px, 7.4vw, 124px);
+  --tool-col: clamp(120px, 8.2vw, 136px);
   --props-col: clamp(214px, 15.4vw, 248px);
 }
 
@@ -148,6 +148,16 @@ body::after {
 .tool-btn {
   padding: 10px;
   text-align: left;
+}
+
+.tool-rail .tool-btn {
+  width: 100%;
+  padding: 9px 8px;
+  font-size: 1.18rem;
+  line-height: 1.06;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .file-label,
@@ -290,6 +300,9 @@ body::after {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .tool-btn.active {
@@ -404,6 +417,7 @@ body::after {
 
 .pdf-page {
   position: relative;
+  flex: 0 0 auto;
   border: 3px solid var(--line);
   border-radius: 4px;
   box-shadow: 6px 6px 0 rgba(16, 18, 24, 0.35);
